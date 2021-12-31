@@ -1,0 +1,82 @@
+#!/usr/bin/expect -f
+
+proc show { text } {
+	system /usr/bin/notify-send \"$text\"
+}
+proc showu { text } {
+	system /usr/bin/notify-send -u critical \"$text\"
+}
+
+set key [lindex $argv 0]
+
+set prompt "#"
+spawn bluetoothctl
+expect -re $prompt
+
+# Get MAC from name of device
+send "devices\r"
+sleep 1
+expect {
+	-re "\.\*Device \(\.\.:\.\.:\.\.:\.\.:\.\.:\.\.\) $key\.\*" { 
+		set address "$expect_out(1,string)"
+	}
+}
+
+# Power on
+send "show\r"
+#sleep 1
+expect {
+	"*Powered: no*" { 
+		send "power on\r"
+		expect {
+			"*Changing power on succeeded*" {
+				show "Bluetooth adapter power on now"
+			}
+		}
+	}
+}
+
+# Check connect
+send "info $address\r"
+expect {
+	"*Connected: yes*" { 
+	show "The device $address is already connected\r" 
+	exit
+	}
+}
+
+
+# Connect
+send "connect $address\r"
+expect {
+	"Attempting to connect to $address" {
+	expect {# Device is off
+		"Failed to connect: org.bluez.Error.Failed br-connection-page-timeout"	{ 
+		showu "The device $address is not available" }
+			# Device is on but need in repairing
+		"Failed to connect: org.bluez.Error.Failed br-connection-unknown" {
+			send "remove $address\r"
+			send "scan on\r"
+			expect {
+				-re "[NEW] Device $address \(\.\*\)" {
+				set name "$expect_out(1,string)"
+				#send "trust $address\r"
+				send "pair $address\r"
+				expect {
+				"Pairing successful" {
+					send "scan off\r"
+					send "connect $address\r"
+					expect {
+						"Connection successful" { show "Device $name connected!" } }
+					}
+				}}
+			}
+		}
+		
+	}
+	}
+}
+
+exit 1
+
+}
