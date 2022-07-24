@@ -1,10 +1,16 @@
 #!/usr/bin/expect -f
 
 proc show { text } {
-	system /usr/bin/notify-send \"$text\"
+	catch { system /usr/bin/notify-send \"$text\" }
 }
 proc showu { text } {
-	system /usr/bin/notify-send -u critical \"$text\"
+	catch {system /usr/bin/notify-send -u critical \"$text\" }
+}
+send "rfkill -r|grep bluetooth\r"
+expect {
+		"0 bluetooth hci0 blocked unblocked"{
+		send "rfkill unblock 0\r"
+	}
 }
 
 set key [lindex $argv 0]
